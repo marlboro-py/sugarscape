@@ -1,14 +1,13 @@
 import mesa
-import numpy as np
-
-from agents import Trader
-from utils import geometric_mean, flatten
 from mesa.discrete_space import OrthogonalVonNeumannGrid
 from mesa.discrete_space.property_layer import PropertyLayer
 
+from agents import Trader
+from utils import geometric_mean, flatten, np
+
 def get_trade(agent):
   """
-  For agent reportes in data collector
+  For agent reports in data collector
 
   Return list of trade partners and None for other agents
   """
@@ -17,6 +16,17 @@ def get_trade(agent):
     return agent.trade_partners
   else: 
       return None
+  
+def get_trader_type(agent):
+    """
+    For agent reports in data collector
+    
+    Return list of instances where agent was buyer or seller
+    """
+    if isinstance(agent, Trader):
+        return agent.bought_or_sold
+    else:
+        return None
 
 class SugarscapeG1mt(mesa.Model):
     """
@@ -60,7 +70,8 @@ class SugarscapeG1mt(mesa.Model):
                 "Price": lambda m: geometric_mean(flatten([a.prices for a in m.agents]))
             },
             agent_reporters = {
-                "Trade Network": lambda a: get_trade(a)
+                "Trade Network": lambda a: get_trade(a),
+                "Buyer or seller": lambda a: get_trader_type(a)
             }
         )
         

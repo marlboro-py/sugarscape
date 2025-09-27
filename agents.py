@@ -1,5 +1,4 @@
-import math
-from utils import get_distance
+from utils import get_distance, math
 from mesa.discrete_space import CellAgent
 
 
