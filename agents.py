@@ -145,7 +145,7 @@ class Trader(CellAgent):
         
         # calculate mrs for both agents
         mrs_self = self.calc_mrs(self.sugar, self.spice)
-        mrs_other = self.calc_mrs(other.sugar, other.spice)
+        mrs_other = other.calc_mrs(other.sugar, other.spice)
         
         # calculate welfare for both agents
         welfare_self = self.calc_welfare(self.sugar, self.spice)
@@ -160,7 +160,7 @@ class Trader(CellAgent):
         buyer_or_seller = "seller" if mrs_self > mrs_other else "buyer"
         
         # self sugar buyer, spice seller
-        if mrs_self > mrs_other:
+        if buyer_or_seller == "seller":
             sold = self.sell_spice(other, price, welfare_self, welfare_other)
             if not sold: # criteria not met - stop trade
                 return

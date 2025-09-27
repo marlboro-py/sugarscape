@@ -43,7 +43,7 @@ class SugarscapeG1mt(mesa.Model):
         # TODO: collect if agent is buyer or seller  
         self.datacollector = mesa.DataCollector(
             model_reporters = {
-                "Trader": lambda m: len(m.agents),
+                "Traders": lambda m: len(m.agents),
                 "Trade Volume": lambda m: sum(len(a.trade_partners) for a in m.agents),
                 "Price": lambda m: geometric_mean(flatten([a.prices for a in m.agents]))
             },
@@ -53,7 +53,7 @@ class SugarscapeG1mt(mesa.Model):
         )
         
         # sugar distribution - spice distribution is the inverse
-        self.sugar_distribution = np.genfromtxt("./data/sugarmap.txt")
+        self.sugar_distribution = np.genfromtxt("/home/ketzer/repos/sugarscape/data/sugarmap.txt")
         self.spice_distribution = np.flip(self.sugar_distribution, 1)
         
         # treats sugar and spice as a cell property layer in the grid
@@ -141,11 +141,12 @@ class SugarscapeG1mt(mesa.Model):
             # reassign that step in the dictionary with lean trade data
             self.datacollector._agent_records[self.steps] = agent_trades
             
-        def run_model(self, step_count=1):
+        def run_model(self, step_count=1000):
+            
             """
             Runs the model
             """
             for i in range(step_count):
                 self.step()
-            
+                
             
