@@ -1,9 +1,9 @@
-import mesa
 import math
 from utils import get_distance
-from resources import Sugar, Spice
+from mesa.discrete_space import CellAgent
 
-class Trader(mesa.Agent):
+
+class Trader(CellAgent):
     """
     Trader:
     - has a metabolism of sugar and spice
@@ -11,13 +11,17 @@ class Trader(mesa.Agent):
     """
     
     def __init__(
-        self, unique_id, model, pos, moore=False,
-        sugar=0, spice=0, metabolism_sugar=0, metabolism_spice=0, vision=0
+        self, 
+        model,
+        cell,
+        sugar=0,
+        spice=0,
+        metabolism_sugar=0,
+        metabolism_spice=0,
+        vision=0
     ):
         super().__init__(model)
-        self.unique_id = unique_id
-        self.pos = pos
-        self.moore = moore
+        self.cell = cell
         self.sugar = sugar
         self.spice = spice
         self.metabolism_sugar = metabolism_sugar 
@@ -27,41 +31,14 @@ class Trader(mesa.Agent):
         self.prices = []
         self.trade_partners = []
     
-    def get_resource(self, pos):
-        """
-        Gets amount of resources
-        """
-        this_cell = self.model.grid.get_cell_list_contents(pos)
-        
-        agents = {
-            type(agent):agent for agent in this_cell
-        }
-
-        sugar = agents.get(Sugar)
-        spice = agents.get(Spice)
-        
-        return {"sugar":sugar, "spice": spice}
-    
-    def get_trader(self, pos):
+    def get_trader(self, cell):
         """
         Identify if agent is of type trader, used in self.trade_with_neighbors()
-        """
-        this_cell = self.model.grid.get_cell_list_contents(pos)
-        
-        for agent in this_cell:
+        """    
+        for agent in cell.agents:
             if isinstance(agent, Trader):
                 return agent 
-    
-    def is_occupied(self, pos):
-        """
-        Identify if cell is occupied by another agent
-        """        
-        a = self.get_trader(pos)
-        if a and not pos == self.pos:
-            return True
-        else:
-            return False
-        
+            
     def calc_welfare(self, sugar, spice):
         """
         Calculates current welfare of the agent
@@ -136,17 +113,17 @@ class Trader(mesa.Agent):
         
         
         # check if both agents have resources
-        if any([self_sugar <= 0, self_spice <= 0, other_sugar <= 0, other_spice <= 0]):
+        if any(x <= 0 for x in [self_sugar, self_spice, other_sugar, other_spice]):
             return False
         
         # Trade criteria #1 - both agents need to be better off
         both_better_off = (
             (welfare_self < self.calc_welfare(self_sugar, self_spice)) and
-            (welfare_other < other.calculate_welfare(other_sugar, other_spice))
+            (welfare_other < other.calc_welfare(other_sugar, other_spice))
         )
         
         # Trade criteria #2 - mrs not crossing - this comes from the Edgeworth Box, where trade happens until the mrs is the same for all agents
-        mrs_not_crossing = self.calc_mrs(self_sugar, self_spice) > other.calculate(other_sugar, other_spice)
+        mrs_not_crossing = self.calc_mrs(self_sugar, self_spice) > other.calc_mrs(other_sugar, other_spice)
         
         if not (both_better_off and mrs_not_crossing):
             return False
@@ -183,7 +160,7 @@ class Trader(mesa.Agent):
         buyer_or_seller = "seller" if mrs_self > mrs_other else "buyer"
         
         # self sugar buyer, spice seller
-        if buyer_or_seller == "seller":
+        if mrs_self > mrs_other:
             sold = self.sell_spice(other, price, welfare_self, welfare_other)
             if not sold: # criteria not met - stop trade
                 return
@@ -212,17 +189,12 @@ class Trader(mesa.Agent):
         
         # step 1
         neighbors = [
-            i for i in self.model.grid.get_neighborhood(
-                self.pos, self.moore, True, self.vision
-            ) if not self.is_occupied(i)
+           cell for cell in self.cell.get_neighborhood(self.vision, include_center=True) if cell.is_empty
         ]
         
         # step 2
         welfares = [
-            self.calc_welfare(
-                self.sugar + self.get_resource(pos).get("sugar").amount,
-                self.spice + self.get_resource(pos).get("spice").amount
-            ) for pos in neighbors
+            self.calc_welfare(self.sugar + cell.sugar, self.spice + cell.spice) for cell in neighbors
         ]
         
         # step 3
@@ -238,35 +210,26 @@ class Trader(mesa.Agent):
         candidates = [neighbors[i] for i in candidates_idx]
         
         # get the minimum euclidean distance between itself and the considered positions
-        min_dist = min(get_distance(self.pos, pos) for pos in candidates)
+        min_dist = min(get_distance(self.cell, cell) for cell in candidates)
         
         # final candidates based on if the distance is close enough
         final_candidates = [
-            pos for pos in candidates if math.isclose(get_distance(self.pos, pos), min_dist)
+            cell for cell in candidates if math.isclose(get_distance(self.cell, cell), min_dist, rel_to=1e-02)
         ]
         
-        # shuffle candidates randomly
-        self.random.shuffle(final_candidates)
-        
-        # step 4 - the agent moves
-        self.model.grid.move_agent(self, final_candidates[0])
+        # step 4
+        self.cell = self.random.choice(final_candidates) 
     
     def eat(self):
         """
         The agent eats in order to survive, according to his metabolism
         """
-        sugar_patch = self.get_resource(self.pos).get("sugar")
-        
-        if sugar_patch:
-            self.sugar += sugar_patch.amount
-            sugar_patch.amount = 0
+        self.sugar += self.cell.sugar
+        self.cell.sugar = 0
         self.sugar -= self.metabolism_sugar
         
-        spice_patch = self.get_resource(self.pos).get("spice")
-        
-        if spice_patch:
-            self.spice += spice_patch
-            spice_patch.amount = 0
+        self.spice += self.cell.spice
+        self.cell.spice = 0
         self.spice -= self.metabolism_spice
 
     def die(self):
@@ -276,8 +239,7 @@ class Trader(mesa.Agent):
         """
         # condition: agent is starved
         if (self.sugar <= 0) or (self.spice <= 0):
-            self.model.grid.remove_agent(self)
-            self.model.schedule.remove(self)
+            self.remove()
             
     def trade_with_neighbors(self):
         """
@@ -287,18 +249,7 @@ class Trader(mesa.Agent):
         2. Trade
         3. Collect data
         """
-        
-        neighbor_agents = [
-            self.get_trader(pos) for pos in self.model.grid.get_neighborhood(
-                self.pos, self.moore, False, self.vision
-            ) if self.is_occupied(pos)
-        ]
-        
-        if len(neighbor_agents) == 0:
-            return
-        
-        for a in neighbor_agents:
-            if a:
-                self.trade(a)
+        for a in self.cell.get_neighborhood(radius=self.vision).agents:
+            self.trade(a)
         
         return

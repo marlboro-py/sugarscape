@@ -1,13 +1,13 @@
 import math
 import numpy as np
 
-def get_distance(pos_1, pos_2):
+def get_distance(cell_1, cell_2):
   """
   Calculate the Euclidean distance between two positions
   """
 
-  x1, y1 = pos_1
-  x2, y2 = pos_2
+  x1, y1 = cell_1.coordinate
+  x2, y2 = cell_2.coordinate
   dx = x1 - x2
   dy = y1 - y2
   return math.sqrt(dx**2 + dy**2)
@@ -32,7 +32,7 @@ def get_trade(agent):
   Return list of trade partners and None for other agents
   """
   
-  if type(agent) == Trader:
+  if isinstance(agent, Trader):
     return agent.trade_partners
   else: 
       return None
