@@ -2,9 +2,21 @@ import mesa
 import numpy as np
 
 from agents import Trader
-from utils import geometric_mean, get_trade, flatten
+from utils import geometric_mean, flatten
 from mesa.discrete_space import OrthogonalVonNeumannGrid
 from mesa.discrete_space.property_layer import PropertyLayer
+
+def get_trade(agent):
+  """
+  For agent reportes in data collector
+
+  Return list of trade partners and None for other agents
+  """
+  
+  if isinstance(agent, Trader):
+    return agent.trade_partners
+  else: 
+      return None
 
 class SugarscapeG1mt(mesa.Model):
     """
@@ -87,66 +99,66 @@ class SugarscapeG1mt(mesa.Model):
             ),
         )
 
-        def step(self):
-            """
-            Function that does staget activation of sugar and spice and then
-            randomly activates trader
-            """
-            
-            # step resource agents
-            self.grid.sugar.data = np.minimum(
-                self.grid.sugar.data + 1, self.sugar_distribution
-            )
-            
-            self.grid.spice.data = np.minimum(
-                self.grid.spice.data + 1, self.spice_distribution
-            )
-            
-            # step trader agents
-            # to account for agent death and removal we need a separate data structure to iterate
-            
-            # this puts traders in a randomized list
-            trader_shuffle = self.agents_by_type[Trader].shuffle()
-            
-            for agent in trader_shuffle:
-                agent.prices = []
-                agent.trade_partners = []
-                agent.bought_or_sold = []
-                agent.move()
-                agent.eat()
-                agent.die()
-                
-            if not self.enable_trade:
-                # return early if trade is not enabled
-                self.datacollector.collect(self)
-                return
+    def step(self):
+        """
+        Function that does staget activation of sugar and spice and then
+        randomly activates trader
+        """
         
-            # randomize traders again
-            trader_shuffle = self.agents_by_type[Trader].shuffle()
+        # step resource agents
+        self.grid.sugar.data = np.minimum(
+            self.grid.sugar.data + 1, self.sugar_distribution
+        )
+        
+        self.grid.spice.data = np.minimum(
+            self.grid.spice.data + 1, self.spice_distribution
+        )
+        
+        # step trader agents
+        # to account for agent death and removal we need a separate data structure to iterate
+        
+        # this puts traders in a randomized list
+        trader_shuffle = self.agents_by_type[Trader].shuffle()
+        
+        for agent in trader_shuffle:
+            agent.prices = []
+            agent.trade_partners = []
+            agent.bought_or_sold = []
+            agent.move()
+            agent.eat()
+            agent.die()
             
-            for agent in trader_shuffle:
-                agent.trade_with_neighbors()
-            
-            # collect model level data
+        if not self.enable_trade:
+            # return early if trade is not enabled
             self.datacollector.collect(self)
+            return
+    
+        # randomize traders again
+        trader_shuffle = self.agents_by_type[Trader].shuffle()
+        
+        for agent in trader_shuffle:
+            agent.trade_with_neighbors()
+        
+        # collect model level data
+        self.datacollector.collect(self)
+        
+        # TODO: see if this is still true
+        # remove excess data, as Mesa does not have a datacollection by agent type feature
+        
+        agent_trades = self.datacollector._agent_records[self.steps]
+        
+        # leverage None aspect of no data in data collector
+        agent_trades = [agent for agent in agent_trades if agent[2] is not None]
+        
+        # reassign that step in the dictionary with lean trade data
+        self.datacollector._agent_records[self.steps] = agent_trades
+        
+    def run_model(self, step_count=1000):
+        
+        """
+        Runs the model
+        """
+        for _ in range(step_count):
+            self.step()
             
-            # TODO: see if this is still true
-            # remove excess data, as Mesa does not have a datacollection by agent type feature
-            
-            agent_trades = self.datacollector._agent_records[self.steps]
-            
-            # leverage None aspect of no data in data collector
-            agent_trades = [agent for agent in agent_trades if agent[2] is not None]
-            
-            # reassign that step in the dictionary with lean trade data
-            self.datacollector._agent_records[self.steps] = agent_trades
-            
-        def run_model(self, step_count=1000):
-            
-            """
-            Runs the model
-            """
-            for i in range(step_count):
-                self.step()
-                
-            
+        

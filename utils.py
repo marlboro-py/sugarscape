@@ -24,15 +24,3 @@ def geometric_mean(list_of_prices):
   Find the geometric mean of a list of prices
   """
   return np.exp(np.log(list_of_prices).mean())
-
-def get_trade(agent):
-  """
-  For agent reportes in data collector
-
-  Return list of trade partners and None for other agents
-  """
-  
-  if isinstance(agent, Trader):
-    return agent.trade_partners
-  else: 
-      return None

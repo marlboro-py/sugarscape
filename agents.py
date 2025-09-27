@@ -127,7 +127,8 @@ class Trader(CellAgent):
         
         if not (both_better_off and mrs_not_crossing):
             return False
-
+        
+        # criteria met, execute trade
         self.exchange_resources(other, sugar_exchanged, spice_exchanged)
         
         return True
@@ -160,7 +161,7 @@ class Trader(CellAgent):
         buyer_or_seller = "seller" if mrs_self > mrs_other else "buyer"
         
         # self sugar buyer, spice seller
-        if buyer_or_seller == "seller":
+        if mrs_self > mrs_other:
             sold = self.sell_spice(other, price, welfare_self, welfare_other)
             if not sold: # criteria not met - stop trade
                 return
@@ -214,7 +215,7 @@ class Trader(CellAgent):
         
         # final candidates based on if the distance is close enough
         final_candidates = [
-            cell for cell in candidates if math.isclose(get_distance(self.cell, cell), min_dist, rel_to=1e-02)
+            cell for cell in candidates if math.isclose(get_distance(self.cell, cell), min_dist, rel_tol=1e-02)
         ]
         
         # step 4
